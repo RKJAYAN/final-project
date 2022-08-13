@@ -1,21 +1,17 @@
-import java.util.StringTokenizer;
-
 public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello world!");
+    public static void main(String[] args) throws Exception {
+        String rootPath = "C:\\Users\\hp\\Desktop\\test\\";
 
-        String delims = " \t\n,;{}[]().-<>&^%$@!-+/*~=";
-String line = "I am a sentence read from a file.";
-StringTokenizer splitter = new StringTokenizer(line, delims, true);
-int numTokens = splitter.countTokens();
-String next = splitter.nextToken();
+        XCriticalTextAnalyzer txtAnalyser = new XCriticalTextAnalyzer(rootPath+"test.java");
 
-        System.out.println(numTokens);
-        System.out.println(next);
+        txtAnalyser.startTextAnalyzer();
+        System.out.println(txtAnalyser.getNumTokens());
+        txtAnalyser.showComments();
+        txtAnalyser.showClass();
+        txtAnalyser.showVariables();
+        txtAnalyser.showSplitter();
 
-        while(splitter.hasMoreElements()){
-            System.out.println(splitter.nextToken());
-        }
+
 
     }
 }
