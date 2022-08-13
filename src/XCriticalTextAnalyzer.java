@@ -6,33 +6,18 @@ import java.util.*;
 
 public class XCriticalTextAnalyzer {
 
-    private StringTokenizer splitter;
-    private List<String> fileDataByLines;
-    private List<String> commentList;
-    private List<String> classList;
-
-    private Map<String, Integer> variableMap;
+    private final String fileName;
 
     public XCriticalTextAnalyzer(String fileName) {
-        commentList = new ArrayList<>();
-        classList = new ArrayList<>();
-        variableMap = new HashMap<>();
-        variableMap.put("int", 0);
-        variableMap.put("char", 0);
-        variableMap.put("byte", 0);
-        variableMap.put("short", 0);
-        variableMap.put("long", 0);
-        variableMap.put("double", 0);
-        variableMap.put("float", 0);
-        variableMap.put("boolean", 0);
-
-        readTextFile(fileName);
+        this.fileName = fileName;
     }
 
-    private void readTextFile (String fileName){
-        fileDataByLines = new ArrayList<>();
+    private List<String> readTextFile (String fileName){
+
+        List<String> fileDataByLines = new LinkedList<>();
+        Reader fr = null;
         try {
-            Reader fr = new FileReader(fileName);
+            fr = new FileReader(fileName);
             BufferedReader br = new BufferedReader(fr);
             String line = null;
 
@@ -46,41 +31,55 @@ public class XCriticalTextAnalyzer {
         }
         catch (Exception e){
             System.out.println("Error in loading data from the file. " + e);
+        }finally {
+            //fr.close();
         }
+        return fileDataByLines;
     }
 
     public void startTextAnalyzer(){
-        SplitText(fileDataByLines);
-        removeComments();
-        SplitText(fileDataByLines);
-        findClass();
-        SplitText(fileDataByLines);
-        findVariables();
-        SplitText(fileDataByLines);
+        StringTokenizer splitter;
+
+        List<String> fileDataByLines = readTextFile(fileName);
+
+
+        splitter = splitText(fileDataByLines);
+        showNoTokens(getNumTokens(splitter));
+
+        showComments(splitComments(fileDataByLines));
+
+        splitter = splitText(fileDataByLines);
+        showClass(findClass(splitter));
+
+        splitter = splitText(fileDataByLines);
+        showVariables(findVariables(splitter));
+
+
+        splitter = splitText(fileDataByLines);
+        showMethods(findMethods(splitter));
     }
 
-    private void SplitText(List<String> data){
+    private StringTokenizer splitText(List<String> data){
         String fileData = "";
         for(String line : data){
             fileData += line;
         }
         String delims = " \t\n,;{}[]().-<>&^%$@!-+/*~=";
-        splitter = new StringTokenizer(fileData, delims, true);
+        return new StringTokenizer(fileData, delims, true);
     }
 
-    public int getNumTokens(){
+    private int getNumTokens(StringTokenizer splitter){
         return splitter.countTokens();
     }
 
-    private void removeComments(){
+    private List<String> splitComments(List<String> fileDataByLines){
 
+        List<String> commentList = new ArrayList<>();
         List<Integer> listOfIndex = new ArrayList<>();
         int count = 0;
         boolean commentFound = false;
 
         //remove all /**/ comments, /**/ within a line
-        count=0;
-        commentFound = false;
         String tempComment = "";
 
         for(String line : fileDataByLines){
@@ -112,7 +111,7 @@ public class XCriticalTextAnalyzer {
             }
             count++;
         }
-        reCreateArray(listOfIndex);
+        reCreateArray(listOfIndex, fileDataByLines);
 
         //remove all single comments,  lines starts with "//" and contains with "//"
         count=0;
@@ -127,10 +126,12 @@ public class XCriticalTextAnalyzer {
             }
             count++;
         }
-        reCreateArray(listOfIndex);
+        reCreateArray(listOfIndex, fileDataByLines);
+
+        return commentList;
     }
 
-    private void reCreateArray(List<Integer> listOfIndex){
+    private void reCreateArray(List<Integer> listOfIndex, List<String> fileDataByLines){
         int count = 0;
         for(int index : listOfIndex) {
             fileDataByLines.remove((index - count));
@@ -138,37 +139,181 @@ public class XCriticalTextAnalyzer {
         }
     }
 
-    private void findClass(){
-        while(splitter.hasMoreTokens()){
-            label_1:
-            if(splitter.nextToken().trim().equalsIgnoreCase("class")){
-                while(true){
-                    String className = splitter.nextToken().trim();
-                    if(!className.equals("")){
-                        classList.add(className);
-                        break label_1;
-                    }
-                }
-            }
-        }
-    }
-
-    private void findVariables(){
+    private List<String> findClass(StringTokenizer splitter){
+        List<String> classList = new ArrayList<>();
+        boolean foundClass = false;
+        String wordText;
+        String classDetails="";
 
         while(splitter.hasMoreTokens()){
-            label_1:
-            if(splitter.nextToken().trim().equalsIgnoreCase("int")){
-                while(true){
-                    String variableName = splitter.nextToken().trim();
-                    if(!variableName.equals("")){
-                        variableMap.replace("int", variableMap.get("int")+1);;
-                        break label_1;
-                    }
-                }
+            wordText = splitter.nextToken().trim();
+
+            if(wordText.equalsIgnoreCase("class")){
+                foundClass = true;
+                continue;
+            }
+            if(!wordText.equals("") && foundClass && !wordText.equalsIgnoreCase("{")){
+                classDetails += " " + wordText;
+            }
+
+            if(wordText.equalsIgnoreCase("{") && foundClass){
+                foundClass = false;
+                classList.add(classDetails);
+                classDetails = "";
+            }
+
+        }
+
+        return classList;
+    }
+
+    private Map<String, Integer> findVariables(StringTokenizer splitter){
+        Map<String, Integer> variableMap = new HashMap<>();
+        Map<String, String> variableNames = new HashMap<>();
+
+        variableMap.put("int", 0);
+        variableMap.put("char", 0);
+        variableMap.put("byte", 0);
+        variableMap.put("short", 0);
+        variableMap.put("long", 0);
+        variableMap.put("double", 0);
+        variableMap.put("float", 0);
+        variableMap.put("boolean", 0);
+
+        variableNames.put("int", "");
+        variableNames.put("char", "");
+        variableNames.put("byte", "");
+        variableNames.put("short", "");
+        variableNames.put("long", "");
+        variableNames.put("double", "");
+        variableNames.put("float", "");
+        variableNames.put("boolean", "");
+
+        boolean foundVariable = false;
+        String variableType = "";
+        String tempValue = "";
+
+        while(splitter.hasMoreTokens()){
+            tempValue = splitter.nextToken().trim();
+
+            if(tempValue.equalsIgnoreCase("int")){
+                foundVariable = true;
+                variableType = "int";
+                continue;
+            }
+
+            if(tempValue.equalsIgnoreCase("char")){
+                foundVariable = true;
+                variableType = "char";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("byte")){
+                foundVariable = true;
+                variableType = "byte";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("short")){
+                foundVariable = true;
+                variableType = "short";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("long")){
+                foundVariable = true;
+                variableType = "long";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("double")){
+                foundVariable = true;
+                variableType = "double";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("float")){
+                foundVariable = true;
+                variableType = "float";
+                continue;
+            }
+            if(tempValue.equalsIgnoreCase("boolean")){
+                foundVariable = true;
+                variableType = "boolean";
+                continue;
+            }
+
+
+            if(!tempValue.equalsIgnoreCase("") && foundVariable){
+                variableMap.replace(variableType, variableMap.get(variableType)+1);
+
+                variableNames.replace(variableType, variableNames.get(variableType) + ", " + tempValue);
+                foundVariable = false;
+            }
+
+            if(tempValue.equalsIgnoreCase(",") && !variableType.equals("")){
+                foundVariable = true;
+            }
+
+            if(tempValue.equalsIgnoreCase(";")){
+                variableType = "";
             }
         }
+        showVariablesNames(variableNames);
+        return variableMap;
     }
-    public void showComments() {
+
+    private List<String> findMethods(StringTokenizer splitter){
+        List<String> methodList = new ArrayList<>();
+        boolean foundMethod = false;
+        String wordText;
+        String methodName="";
+        int count = 0;//to remove "if(x >0)"
+
+        while(splitter.hasMoreTokens()){
+            wordText = splitter.nextToken().trim();
+
+            if(wordText.equals("") ){
+                continue;
+            }
+
+            if(wordText.equalsIgnoreCase("void") ||
+                    wordText.equalsIgnoreCase("int") ||
+                    wordText.equalsIgnoreCase("char") ||
+                    wordText.equalsIgnoreCase("byte") ||
+                    wordText.equalsIgnoreCase("short") ||
+                    wordText.equalsIgnoreCase("long") ||
+                    wordText.equalsIgnoreCase("double") ||
+                    wordText.equalsIgnoreCase("float") ||
+                    wordText.equalsIgnoreCase("boolean")){
+                foundMethod = true;
+                count++;
+                continue;
+            }
+            if(wordText.equals("=") || wordText.equals(";")) {//just a variable declaration found
+                foundMethod = false;
+                methodName = "";
+                continue;
+            }
+            if(wordText.equals("(") && foundMethod ){
+                methodList.add(methodName);
+                foundMethod = false;
+                methodName = "";
+                continue;
+            }
+
+            if(count ==  3){foundMethod = false; count=0;}
+
+            if(!wordText.equals("") && foundMethod ){
+                methodName = wordText;
+                count++;
+            }
+
+        }
+        return methodList;
+    }
+
+    public void showNoTokens(int noOfTokens) {
+        System.out.println("------------------------------");
+        System.out.println("No of Tokens Found : " + noOfTokens);
+        System.out.println("==============================");
+    }
+    public void showComments(List<String> commentList) {
         System.out.println("------------------------------");
         System.out.println("No of Comments Found : " + commentList.size());
         System.out.println("------------------------------");
@@ -177,7 +322,7 @@ public class XCriticalTextAnalyzer {
         }
         System.out.println("==============================");
     }
-    public void showClass() {
+    public void showClass(List<String> classList) {
         System.out.println("------------------------------");
         System.out.println("No of Class Found : " + classList.size());
         System.out.println("------------------------------");
@@ -186,9 +331,9 @@ public class XCriticalTextAnalyzer {
         }
         System.out.println("==============================");
     }
-    public void showVariables() {
+    public void showVariables(Map<String, Integer> variableMap) {
         System.out.println("------------------------------");
-        System.out.println("No of Variables Found : " + "~");
+        System.out.println("No of Variables Found : " );
         System.out.println("------------------------------");
             System.out.println("int : " + variableMap.get("int"));
             System.out.println("char : " + variableMap.get("char"));
@@ -200,14 +345,38 @@ public class XCriticalTextAnalyzer {
             System.out.println("boolean : " + variableMap.get("boolean"));
         System.out.println("==============================");
     }
+    public void showVariablesNames(Map<String, String> variableNames) {
+        System.out.println("------------------------------");
+        System.out.println("Variables Names ");
+        System.out.println("------------------------------");
 
-    public void showDataFile(){
+        for(Map.Entry<String, String> variablName : variableNames.entrySet()){
+            String tempValue = variablName.getValue();
+            if(tempValue.trim().equals("")){
+                tempValue = " -";
+            }else{
+                tempValue = tempValue.substring(1);
+            }
+            System.out.println(variablName.getKey() + " : " + tempValue);
+        }
+        System.out.println("==============================");
+    }
+    public void showMethods(List<String> methodList) {
+        System.out.println("------------------------------");
+        System.out.println("No of Method(s) Found : " + methodList.size());
+        System.out.println("------------------------------");
+        for (String h : methodList) {
+            System.out.println("Method Name : " + h.trim());
+        }
+        System.out.println("==============================");
+    }
+    public void showDataFile(List<String> fileDataByLines){
         System.out.println(fileDataByLines.size());
         for(String h: fileDataByLines){
             System.out.println(h.trim());
         }
     }
-    public void showSplitter(){
+    public void showSplitter(StringTokenizer splitter){
         while (splitter.hasMoreTokens()){
             System.out.println(splitter.nextToken());
         }
