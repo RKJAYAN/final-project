@@ -32,7 +32,12 @@ public class CriticalTextAnalyzer {
         catch (Exception e){
             System.out.println("Error in loading data from the file. " + e);
         }finally {
-            //fr.close();
+            try{
+                fr.close();
+            }
+            catch (IOException ioe){
+                System.out.println("Error closing file reader. " + ioe);
+            }
         }
         return fileDataByLines;
     }
